@@ -1,0 +1,438 @@
+/* ============================================
+   1. VARIABILI E RESET GLOBALI
+   ============================================ */
+:root {
+    --primary: #2563eb;
+    /* Blu */
+    --primary-dark: #1e40af;
+    --secondary: #64748b;
+    /* Grigio */
+    --success: #22c55e;
+    /* Verde */
+    --danger: #ef4444;
+    /* Rosso */
+    --warning: #f59e0b;
+    /* Giallo */
+    --bg: #f8fafc;
+    /* Sfondo */
+    --white: #ffffff;
+    --text: #0f172a;
+    --border: #e2e8f0;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+}
+
+/* ============================================
+   2. NAVBAR (Sia Landing che Dashboard)
+   ============================================ */
+.navbar,
+.landing-navbar {
+    background: var(--white);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.brand {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-menu span {
+    font-weight: 600;
+    color: var(--secondary);
+}
+
+.user-menu button {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 6px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.user-menu button:hover {
+    background: var(--danger);
+    color: var(--white);
+}
+
+/* ============================================
+   3. HERO SECTION & LANDING (Per la Home)
+   ============================================ */
+.homepage {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.hero-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 6rem 2rem;
+    background: radial-gradient(circle at center, #ffffff 0%, #eff6ff 100%);
+}
+
+.hero-section h1 {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: var(--primary-dark);
+    margin-bottom: 1rem;
+}
+
+.hero-section p {
+    font-size: 1.2rem;
+    color: var(--secondary);
+    margin-bottom: 2rem;
+}
+
+.btn-cta {
+    background: var(--primary);
+    color: var(--white);
+    padding: 15px 40px;
+    border: none;
+    border-radius: 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    transition: transform 0.2s;
+}
+
+.btn-cta:hover {
+    transform: scale(1.05);
+}
+
+.features-section {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--white);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 2rem auto;
+}
+
+.feature-card {
+    background: #f8fafc;
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    transition: transform 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+}
+
+.feature-card .icon {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+/* ============================================
+   4. DASHBOARD - TABS (Qui c'era il problema!)
+   ============================================ */
+.container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 2rem;
+    padding-bottom: 0;
+}
+
+.tabs button {
+    background: none;
+    border: none;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    /* Sovrappone la linea sotto */
+    transition: all 0.2s;
+}
+
+.tabs button:hover {
+    color: var(--primary);
+    background-color: #f1f5f9;
+    border-radius: 8px 8px 0 0;
+}
+
+.tabs button.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    font-weight: 700;
+    background-color: transparent;
+}
+
+/* ============================================
+   5. DASHBOARD - CARDS & TABLES
+   ============================================ */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+/* Tabelle Dashboard Medico */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #f8fafc;
+}
+
+th {
+    text-align: left;
+    padding: 1rem;
+    color: var(--secondary);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badges Stato */
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.badge.pending {
+    background: #fef9c3;
+    color: #854d0e;
+}
+
+.badge.confirmed {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.badge.completed {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge.cancelled {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* ============================================
+   6. FORMS & LOGIN (Stile Unificato)
+   ============================================ */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    padding: 20px;
+}
+
+.login-box,
+.form-box {
+    background: var(--white);
+    padding: 2.5rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    /* Centra form box */
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: #f8fafc;
+}
+
+input:focus,
+select:focus {
+    outline: 2px solid var(--primary);
+    background-color: var(--white);
+    border-color: transparent;
+}
+
+button[type="submit"],
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+button[type="submit"]:hover,
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+/* Pulsanti Piccoli (Azioni tabella) */
+.btn-success {
+    background: #22c55e;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Slots per Prenotazione */
+.slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.slot {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--white);
+}
+
+.slot:hover {
+    border-color: var(--primary);
+    background: #eff6ff;
+}
+
+.slot.selected {
+    background: var(--primary);
+    color: var(--white);
+    border-color: var(--primary);
+}
+
+
+/* FIX PULSANTI */
+.back-link {
+    background: none;
+    border: none;
+    color: var(--secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    margin-bottom: 1rem;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-outline:hover {
+    background: var(--primary);
+    color: var(--white);
+}
