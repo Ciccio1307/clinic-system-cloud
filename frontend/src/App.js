@@ -80,7 +80,7 @@ function HomePage({ onEnter }) {
             </nav>
 
             <header className="hero-section">
-                <h1>La tua salute,<br />la nostra priorità.</h1>
+                <h1>La tua salute,<br />la nostra priorità!</h1>
                 <p>Prenotazioni online immediate, referti digitali e un team di specialisti sempre al tuo fianco.</p>
                 <button className="btn-cta" onClick={onEnter}>Prenota Ora</button>
             </header>
