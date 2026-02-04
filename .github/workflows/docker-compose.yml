@@ -8,64 +8,41 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Terraform Init & Apply
-      working-directory: ./terraform
-      run: |
-        terraform init
-        terraform apply -auto-approve
+      - name: Build, tag, and push Backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BACKEND_REPO }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-  
-    - name: Get Load Balancer URL
-      id: get_url
-      working-directory: ./terraform
-      run: |
-        LB_DNS=$(terraform output -raw load_balancer_dns)
-        echo "REACT_APP_API_URL=http://$LB_DNS" >> $GITHUB_ENV
-        echo "L'URL catturato è: http://$LB_DNS"
+      - name: Build, tag, and push Frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPO }}
+          IMAGE_TAG: latest
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+        run: |
+          docker build --build-arg REACT_APP_API_URL=$REACT_APP_API_URL -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build & Push Frontend
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: clinica-frontend
-        IMAGE_TAG: latest
-      run: |
-        # Qui passiamo la variabile catturata prima (--build-arg)
-        docker build \
-          --build-arg REACT_APP_API_URL=${{ env.REACT_APP_API_URL }} \
-          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
-        
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    - name: Build & Push Backend
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: clinica-backend
-        IMAGE_TAG: latest
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-    # --- STEP 5: Aggiorna i servizi per usare le nuove immagini ---
-    - name: Force ECS Deployment
-      run: |
-        aws ecs update-service --cluster clinica-cluster --service clinica-backend-service --force-new-deployment
-        aws ecs update-service --cluster clinica-cluster --service clinica-frontend-service --force-new-deployment
+      - name: Force ECS Deployment
+        run: |
+          aws ecs update-service --cluster ${{ secrets.ECS_CLUSTER }} --service ${{ secrets.ECS_SERVICE }} --force-new-deployment
