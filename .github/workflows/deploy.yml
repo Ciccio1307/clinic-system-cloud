@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -20,53 +20,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # --- 1. CONFIGURA TERRAFORM (CORRETTO) ---
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_wrapper: false # FONDAMENTALE per catturare l'output pulito
-
-      # --- 2. LANCIA TERRAFORM & CATTURA IL LINK ---
-      - name: Terraform Apply & Get URL
-        id: terraform
-        working-directory: ./terraform
-        run: |
-          terraform init
-          terraform apply -auto-approve
-          
-          # CATTURA OUTPUT: Ora sarà pulito grazie a terraform_wrapper: false
-          LB_URL=$(terraform output -raw load_balancer_dns)
-          
-          # LO SALVA COME VARIABILE PER GLI STEP SUCCESSIVI
-          echo "REACT_APP_API_URL=http://$LB_URL" >> $GITHUB_ENV
-          echo "🌐 URL Catturato: http://$LB_URL"
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # --- 3. BUILD BACKEND ---
-      - name: Build & Push Backend
+      - name: Build, tag, and push Backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: clinica-backend
+          ECR_REPOSITORY: ${{ secrets.ECR_BACKEND_REPO }}
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # --- 4. BUILD FRONTEND ---
-      - name: Build & Push Frontend
+      - name: Build, tag, and push Frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: clinica-frontend
+          ECR_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPO }}
           IMAGE_TAG: latest
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
         run: |
-          docker build --build-arg REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }} -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
+          docker build --build-arg REACT_APP_API_URL=$REACT_APP_API_URL -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # --- 5. AGGIORNA ENTRAMBI I SERVIZI ---
       - name: Force ECS Deployment
         run: |
-          aws ecs update-service --cluster clinica-cluster --service clinica-backend-service --force-new-deployment
-          aws ecs update-service --cluster clinica-cluster --service clinica-frontend-service --force-new-deployment
+          aws ecs update-service --cluster ${{ secrets.ECS_CLUSTER }} --service ${{ secrets.ECS_SERVICE }} --force-new-deployment
