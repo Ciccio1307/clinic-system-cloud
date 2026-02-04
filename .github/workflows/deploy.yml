@@ -20,10 +20,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # --- 1. CONFIGURA TERRAFORM (CORRETTO) ---
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false # FONDAMENTALE per catturare l'output pulito
 
-      # Questo passaggio crea l'infrastruttura e salva l'URL del Load Balancer
+      # --- 2. LANCIA TERRAFORM & CATTURA IL LINK ---
       - name: Terraform Apply & Get URL
         id: terraform
         working-directory: ./terraform
@@ -31,7 +34,7 @@ jobs:
           terraform init
           terraform apply -auto-approve
           
-          # CATTURA OUTPUT: Prende l'URL generato da Terraform
+          # CATTURA OUTPUT: Ora sarà pulito grazie a terraform_wrapper: false
           LB_URL=$(terraform output -raw load_balancer_dns)
           
           # LO SALVA COME VARIABILE PER GLI STEP SUCCESSIVI
@@ -42,23 +45,23 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      # --- 3. BUILD BACKEND ---
       - name: Build & Push Backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: clinica-backend  # Nome fisso come in Terraform
+          ECR_REPOSITORY: clinica-backend
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # --- 4. BUILD FRONTEND (Qui iniettiamo l'URL magico) ---
+      # --- 4. BUILD FRONTEND ---
       - name: Build & Push Frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: clinica-frontend # Nome fisso come in Terraform
+          ECR_REPOSITORY: clinica-frontend
           IMAGE_TAG: latest
         run: |
-          # Passiamo la variabile catturata al punto 2
           docker build --build-arg REACT_APP_API_URL=${{ env.REACT_APP_API_URL }} -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
