@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -24,25 +24,31 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      # --- 1. BUILD BACKEND ---
       - name: Build, tag, and push Backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_BACKEND_REPO }}
+          ECR_REPOSITORY: clinica-backend  # Nome fisso (come in Terraform)
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # --- 2. BUILD FRONTEND ---
       - name: Build, tag, and push Frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPO }}
+          ECR_REPOSITORY: clinica-frontend # Nome fisso (come in Terraform)
           IMAGE_TAG: latest
+          # Questo Secret deve contenere l'URL del Load Balancer (es. http://clinica-lb-....amazonaws.com)
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
         run: |
           docker build --build-arg REACT_APP_API_URL=$REACT_APP_API_URL -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # --- 3. AGGIORNA ENTRAMBI I SERVIZI ---
+      # Qui stava l'errore: ora forziamo l'aggiornamento di Backend E Frontend
       - name: Force ECS Deployment
         run: |
-          aws ecs update-service --cluster ${{ secrets.ECS_CLUSTER }} --service ${{ secrets.ECS_SERVICE }} --force-new-deployment
+          aws ecs update-service --cluster clinica-cluster --service clinica-backend-service --force-new-deployment
+          aws ecs update-service --cluster clinica-cluster --service clinica-frontend-service --force-new-deployment
