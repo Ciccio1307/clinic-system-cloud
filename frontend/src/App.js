@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { BarChart, Bar, Tooltip, ResponsiveContainer } from 'recharts';
-import { Search, Filter, User, Calendar, CheckCircle, Clock, XCircle, FileText, LogOut, Upload, Activity, ArrowLeft, Settings, Lock } from 'lucide-react';
+import {
+    Search, User, Calendar, CheckCircle, Clock,
+    Activity, ArrowLeft, Lock, Edit, FileText, Download
+} from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-// --- LISTA SPECIALIZZAZIONI (Unica fonte di verità) ---
+// --- LISTA SPECIALIZZAZIONI ---
 const SPECIALIZATIONS = [
     "Cardiologia", "Dermatologia", "Ortopedia", "Pediatria", "Oculistica",
     "Ginecologia", "Neurologia", "Psichiatria", "Urologia",
@@ -68,7 +70,7 @@ function App() {
 }
 
 // ============================================
-// 0. HOMEPAGE (Generica e Professionale)
+// 0. HOMEPAGE
 // ============================================
 
 function HomePage({ onEnter }) {
@@ -109,9 +111,17 @@ function HomePage({ onEnter }) {
     );
 }
 
+// ============================================
+// 1. LOGIN & REGISTRAZIONE (AGGIORNATO)
+// ============================================
+
 function LoginPage({ onLogin, onBack }) {
     const [isLogin, setIsLogin] = useState(true);
-    const [formData, setFormData] = useState({ email: '', password: '', role: 'patient', name: '', surname: '', phone: '', specialization: '' });
+    // Stato controllato per tutti i campi
+    const [formData, setFormData] = useState({
+        email: '', password: '', role: 'patient',
+        name: '', surname: '', phone: '', specialization: ''
+    });
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
@@ -122,11 +132,24 @@ function LoginPage({ onLogin, onBack }) {
                 const res = await axios.post(`${API_URL}/api/auth/login`, { email: formData.email, password: formData.password });
                 onLogin(res.data.token, res.data.user);
             } else {
+                // Controllo lunghezza telefono (opzionale doppio check)
+                if (formData.phone.length !== 10 && formData.role === 'patient') {
+                    // Qui potresti lanciare un errore, ma il blocco input lo previene già
+                }
+
                 await axios.post(`${API_URL}/api/auth/register`, { ...formData, specialization: formData.role === 'doctor' ? formData.specialization : null });
                 toast.success('Registrato! Ora accedi.');
                 setIsLogin(true);
             }
         } catch (error) { toast.error(getErrorMessage(error)); } finally { setLoading(false); }
+    };
+
+    // --- GESTIONE TELEFONO (SOLO NUMERI, MAX 10) ---
+    const handlePhoneChange = (e) => {
+        const onlyNums = e.target.value.replace(/[^0-9]/g, '');
+        if (onlyNums.length <= 10) {
+            setFormData({ ...formData, phone: onlyNums });
+        }
     };
 
     return (
@@ -137,9 +160,27 @@ function LoginPage({ onLogin, onBack }) {
                 <form onSubmit={handleSubmit}>
                     {!isLogin && (
                         <>
-                            <input placeholder="Nome" onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-                            <input placeholder="Cognome" onChange={e => setFormData({ ...formData, surname: e.target.value })} required />
-                            <input placeholder="Telefono" onChange={e => setFormData({ ...formData, phone: e.target.value })} required />
+                            <input
+                                placeholder="Nome"
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                required
+                            />
+                            <input
+                                placeholder="Cognome"
+                                value={formData.surname}
+                                onChange={e => setFormData({ ...formData, surname: e.target.value })}
+                                required
+                            />
+
+                            {/* INPUT TELEFONO BLOCCATO */}
+                            <input
+                                type="tel"
+                                placeholder="Telefono (10 cifre)"
+                                value={formData.phone}
+                                onChange={handlePhoneChange}
+                                required
+                            />
 
                             <select onChange={e => setFormData({ ...formData, role: e.target.value })} value={formData.role}>
                                 <option value="patient">Sono un Paziente</option>
@@ -154,8 +195,20 @@ function LoginPage({ onLogin, onBack }) {
                             )}
                         </>
                     )}
-                    <input type="email" placeholder="Email" onChange={e => setFormData({ ...formData, email: e.target.value })} required />
-                    <input type="password" placeholder="Password" onChange={e => setFormData({ ...formData, password: e.target.value })} required />
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={formData.email}
+                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                        required
+                    />
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        required
+                    />
                     <button type="submit" disabled={loading} className="btn-primary">{loading ? '...' : (isLogin ? 'Entra' : 'Registrati')}</button>
                 </form>
                 <p className="toggle-link" onClick={() => setIsLogin(!isLogin)}>{isLogin ? 'Non hai un account? Registrati' : 'Hai già un account? Accedi'}</p>
@@ -165,7 +218,7 @@ function LoginPage({ onLogin, onBack }) {
 }
 
 // ============================================
-// 2. DASHBOARD MEDICO
+// 2. DASHBOARD MEDICO (AGGIORNATA)
 // ============================================
 
 function DoctorDashboardAdvanced({ user, onLogout }) {
@@ -174,7 +227,10 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
     const [filteredAppts, setFilteredAppts] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+
+    // Modali
     const [uploadModal, setUploadModal] = useState(null);
+    const [editReportModal, setEditReportModal] = useState(null);
 
     const fetchData = async () => {
         try {
@@ -217,9 +273,11 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
             <div className="container">
                 <div className="tabs">
                     <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Dashboard</button>
+                    <button className={view === 'reports' ? 'active' : ''} onClick={() => setView('reports')}>Gestione Referti</button>
                     <button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}>Profilo</button>
                 </div>
 
+                {/* VISTA DASHBOARD (APPUNTAMENTI) */}
                 {view === 'dashboard' && (
                     <>
                         <div className="card-grid">
@@ -271,17 +329,32 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
                     </>
                 )}
 
+                {/* VISTA REFERTI (NUOVA) */}
+                {view === 'reports' && <DoctorReportsList onEditReport={setEditReportModal} />}
+
+                {/* VISTA PROFILO */}
                 {view === 'profile' && <UserProfile user={user} />}
 
             </div>
 
-            {/* MODALE UPLOAD */}
+            {/* MODALE UPLOAD (NUOVO REFERTO) */}
             {uploadModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <div className="card" style={{ width: '500px', padding: '2rem' }}>
+                <div className="modal-overlay">
+                    <div className="card modal-content">
                         <h3>Carica Referto per {uploadModal.patient_name}</h3>
                         <UploadForm appointment={uploadModal} onClose={() => setUploadModal(null)} />
-                        <button onClick={() => setUploadModal(null)} style={{ marginTop: '1rem', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Chiudi</button>
+                        <button onClick={() => setUploadModal(null)} className="btn-close">Chiudi</button>
+                    </div>
+                </div>
+            )}
+
+            {/* MODALE EDIT (MODIFICA NOTE REFERTO) */}
+            {editReportModal && (
+                <div className="modal-overlay">
+                    <div className="card modal-content">
+                        <h3>Modifica Note Referto</h3>
+                        <EditReportForm report={editReportModal} onClose={() => setEditReportModal(null)} />
+                        <button onClick={() => setEditReportModal(null)} className="btn-close">Chiudi</button>
                     </div>
                 </div>
             )}
@@ -289,6 +362,69 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
     );
 }
 
+// --- COMPONENTE LISTA REFERTI (Lato Medico) ---
+function DoctorReportsList({ onEditReport }) {
+    const [reports, setReports] = useState([]);
+
+    const fetchReports = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/reports/my`);
+            setReports(res.data);
+        } catch (e) {
+            toast.error("Errore caricamento referti");
+        }
+    };
+
+    useEffect(() => { fetchReports(); }, []);
+
+    const download = (id, name) => {
+        axios.get(`${API_URL}/api/reports/${id}/download`, { responseType: 'blob' })
+            .then(res => {
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url; link.setAttribute('download', name);
+                document.body.appendChild(link); link.click();
+            });
+    };
+
+    return (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {reports.length === 0 ? <p style={{ padding: '1rem' }}>Nessun referto caricato.</p> : (
+                <table>
+                    <thead>
+                        <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                            <th style={{ padding: '1rem' }}>Data Esame</th>
+                            <th style={{ padding: '1rem' }}>Tipo</th>
+                            <th style={{ padding: '1rem' }}>Note Attuali</th>
+                            <th style={{ padding: '1rem' }}>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {reports.map(r => (
+                            <tr key={r.report_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '1rem' }}>{r.exam_date}</td>
+                                <td style={{ padding: '1rem', fontWeight: 'bold' }}>{r.exam_type}</td>
+                                <td style={{ padding: '1rem', maxWidth: '300px', fontSize: '0.9rem', color: '#666' }}>
+                                    {r.notes || "Nessuna nota"}
+                                </td>
+                                <td style={{ padding: '1rem', display: 'flex', gap: '10px' }}>
+                                    <button className="btn-outline" onClick={() => download(r.report_id, r.original_filename)} title="Scarica">
+                                        <Download size={16} />
+                                    </button>
+                                    <button className="btn-primary" onClick={() => onEditReport(r)} title="Modifica Note">
+                                        <Edit size={16} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+}
+
+// --- FORM UPLOAD (POST) ---
 function UploadForm({ appointment, onClose }) {
     const [file, setFile] = useState(null);
     const [notes, setNotes] = useState('');
@@ -316,6 +452,35 @@ function UploadForm({ appointment, onClose }) {
             <input type="file" onChange={e => setFile(e.target.files[0])} required />
             <textarea placeholder="Note cliniche..." value={notes} onChange={e => setNotes(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #ddd' }} />
             <button type="submit" className="btn-primary">Carica PDF</button>
+        </form>
+    );
+}
+
+// --- FORM MODIFICA (PATCH) ---
+function EditReportForm({ report, onClose }) {
+    const [notes, setNotes] = useState(report.notes || '');
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await axios.patch(`${API_URL}/api/reports/${report.report_id}`, { notes: notes });
+            toast.success("Note aggiornate con successo!");
+            window.location.reload();
+        } catch (err) {
+            toast.error("Errore durante l'aggiornamento");
+        }
+    };
+
+    return (
+        <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ fontSize: '0.9rem', color: '#666' }}>Stai modificando le note per il referto del <b>{report.exam_date}</b>.</p>
+            <textarea
+                placeholder="Modifica note cliniche..."
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', minHeight: '100px' }}
+            />
+            <button type="submit" className="btn-primary">Salva Modifiche</button>
         </form>
     );
 }
