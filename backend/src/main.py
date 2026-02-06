@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key, Attr
 from passlib.context import CryptContext
 
-app = FastAPI(title="Clinica API - Enterprise Edition", version="4.7.0")
+app = FastAPI(title="Clinica API - Enterprise Edition", version="4.8.0")
 
 # --- CONFIGURAZIONE AWS ---
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
@@ -78,7 +78,7 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
-# --- MODELLO PER UPDATE NOTE REFERTO (NUOVO) ---
+# --- MODELLO PER UPDATE NOTE REFERTO ---
 class ReportUpdate(BaseModel):
     notes: str
 
@@ -165,24 +165,21 @@ async def login(data: LoginRequest):
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
     return current_user
 
-# --- ENDPOINT: CAMBIO PASSWORD ---
 @app.post("/api/users/change-password")
 async def change_password(data: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
-    # 1. Recupera l'utente dal DB per avere l'hash aggiornato e sicuro
+    # 1. Recupera l'utente dal DB
     response = table.get_item(Key={'PK': f"USER#{current_user['user_id']}", 'SK': 'PROFILE'})
     user_record = response.get('Item')
 
     if not user_record:
         raise HTTPException(status_code=404, detail="Utente non trovato")
 
-    # 2. Verifica che la VECCHIA password sia corretta
+    # 2. Verifica vecchia password
     if not pwd_context.verify(data.old_password, user_record['password_hash']):
         raise HTTPException(status_code=400, detail="La vecchia password non è corretta")
 
-    # 3. Hasha la NUOVA password
+    # 3. Aggiorna password
     new_hashed_password = pwd_context.hash(data.new_password)
-
-    # 4. Aggiorna nel Database
     table.update_item(
         Key={'PK': f"USER#{current_user['user_id']}", 'SK': 'PROFILE'},
         UpdateExpression="set #p = :p",
@@ -198,7 +195,6 @@ async def get_doctors(specialization: Optional[str] = None):
     if specialization:
         filter_exp = filter_exp & Attr('specialization').eq(specialization)
     response = table.scan(FilterExpression=filter_exp)
-    # Rimuoviamo password_hash manualmente dalla lista per sicurezza extra
     doctors = []
     for doc in response['Items']:
         doc.pop('password_hash', None)
@@ -230,16 +226,17 @@ async def create_appointment(data: AppointmentRequest, current_user: dict = Depe
     if current_user['role'] != UserRole.PATIENT:
         raise HTTPException(status_code=403, detail="Solo pazienti")
     
-    # 1. Verifica slot (ignorando i cancellati)
+    # 1. Verifica slot
     scan = table.scan(FilterExpression=Attr('doctor_id').eq(data.doctor_id) & Attr('date').eq(data.date) & Attr('time_slot').eq(data.time_slot) & Attr('SK').eq('APPT'))
     active_appts = [a for a in scan['Items'] if a.get('status') != AppointmentStatus.CANCELLED]
     
     if len(active_appts) > 0:
         raise HTTPException(status_code=400, detail="Slot occupato")
 
-    # 🚀 PERFORMANCE FIX: Denormalizzazione
+    # 2. Recupero dati Dottore
     doc_res = table.get_item(Key={'PK': f"USER#{data.doctor_id}", 'SK': 'PROFILE'})
     doctor_data = doc_res.get('Item', {})
+    doctor_email = doctor_data.get('email')
     
     doctor_name = f"Dr. {doctor_data.get('name', 'N/A')} {doctor_data.get('surname', 'N/A')}"
     doctor_spec = doctor_data.get('specialization', 'Generico')
@@ -249,9 +246,9 @@ async def create_appointment(data: AppointmentRequest, current_user: dict = Depe
         'PK': f"APPT#{appt_id}", 'SK': 'APPT',
         'appointment_id': appt_id, 
         'patient_id': current_user['user_id'], 
-        'patient_name': f"{current_user['name']} {current_user['surname']}", # Utile per il dottore
+        'patient_name': f"{current_user['name']} {current_user['surname']}", 
         'doctor_id': data.doctor_id,
-        'doctor_name': doctor_name, # Utile per il paziente
+        'doctor_name': doctor_name, 
         'doctor_specialization': doctor_spec,
         'date': data.date, 
         'time_slot': data.time_slot, 
@@ -260,6 +257,32 @@ async def create_appointment(data: AppointmentRequest, current_user: dict = Depe
         'created_at': datetime.now().isoformat()
     }
     table.put_item(Item=item)
+
+    # 🔔 NOTIFICA SNS RICCA AL DOTTORE
+    if doctor_email:
+        try:
+            subj = f"Richiesta Appuntamento: {current_user['name']} {current_user['surname']}"
+            msg_text = (
+                f"Gentile Dr. {doctor_data.get('surname', '')},\n\n"
+                f"È stata richiesta una nuova prenotazione.\n"
+                f"------------------------------------------------\n"
+                f"PAZIENTE: {current_user['name']} {current_user['surname']}\n"
+                f"DATA: {data.date}\n"
+                f"ORA: {data.time_slot}\n"
+                f"MOTIVO: {data.reason}\n"
+                f"CONTATTO PAZIENTE: {current_user.get('phone', 'N/A')}\n"
+                f"------------------------------------------------\n\n"
+                f"Acceda alla Dashboard Medici per confermare o rifiutare la richiesta."
+            )
+            sns_client.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Message=msg_text,
+                Subject=subj,
+                MessageAttributes={'email': {'DataType': 'String', 'StringValue': doctor_email}}
+            )
+        except Exception as e:
+            print(f"Errore invio SNS Dottore: {e}")
+
     return item
 
 @app.get("/api/appointments/my")
@@ -267,31 +290,24 @@ async def get_my_appointments(current_user: dict = Depends(get_current_user)):
     user_id = current_user['user_id']
     role = current_user['role']
     filter_exp = Attr('patient_id').eq(user_id) if role == UserRole.PATIENT else Attr('doctor_id').eq(user_id)
-    
-    # Escludiamo i cancellati dalla vista principale
     filter_exp = filter_exp & Attr('status').ne(AppointmentStatus.CANCELLED)
-    
     response = table.scan(FilterExpression=filter_exp & Attr('SK').eq('APPT'))
     return response['Items']
 
-# --- CANCELLAZIONE (Soft Delete) ---
 @app.delete("/api/appointments/{appointment_id}")
 async def delete_appointment(appointment_id: str, current_user: dict = Depends(get_current_user)):
-    # 1. Recupera l'appuntamento
     res = table.get_item(Key={'PK': f"APPT#{appointment_id}", 'SK': 'APPT'})
     appt = res.get('Item')
     
     if not appt:
         raise HTTPException(status_code=404, detail="Appuntamento non trovato")
 
-    # 2. Controllo PROPRIETÀ
     is_patient = current_user['role'] == UserRole.PATIENT and appt['patient_id'] == current_user['user_id']
     is_doctor = current_user['role'] == UserRole.DOCTOR and appt['doctor_id'] == current_user['user_id']
 
     if not (is_patient or is_doctor):
-        raise HTTPException(status_code=403, detail="Non autorizzato a cancellare questo appuntamento")
+        raise HTTPException(status_code=403, detail="Non autorizzato")
 
-    # 3. Imposta stato a CANCELLED
     table.update_item(
         Key={'PK': f"APPT#{appointment_id}", 'SK': 'APPT'},
         UpdateExpression="set #s = :s",
@@ -300,7 +316,7 @@ async def delete_appointment(appointment_id: str, current_user: dict = Depends(g
     )
     return {"message": "Appuntamento cancellato"}
 
-# 🔥 FIX UNIVERSALE PER AGENDA (Accetta POST/PUT/PATCH per aggiornamento stato) 🔥
+# 🔥 AGGIORNAMENTO STATO + NOTIFICA PAZIENTE 🔥
 @app.api_route("/api/appointments/{appointment_id}/status", methods=["POST", "PUT", "PATCH"])
 async def universal_status_update(
     appointment_id: str,
@@ -312,7 +328,6 @@ async def universal_status_update(
     if current_user['role'] != UserRole.DOCTOR:
         raise HTTPException(status_code=403, detail="Solo i dottori possono gestire appuntamenti")
 
-    # 1. Cerca lo stato ovunque (Query params o Body JSON)
     final_status = status_query
     if not final_status and status_body and 'status' in status_body:
         final_status = status_body['status']
@@ -320,22 +335,53 @@ async def universal_status_update(
     if not final_status:
          raise HTTPException(status_code=422, detail="Parametro 'status' mancante")
 
-    # 2. Aggiorna
     try:
-        table.update_item(
+        updated_res = table.update_item(
             Key={'PK': f"APPT#{appointment_id}", 'SK': 'APPT'},
             UpdateExpression="set #s = :s",
             ExpressionAttributeNames={'#s': 'status'},
             ExpressionAttributeValues={':s': final_status},
-            ReturnValues="UPDATED_NEW"
+            ReturnValues="ALL_NEW"
         )
+        
+        appointment = updated_res.get('Attributes')
+
+        # 🔔 NOTIFICA SNS AL PAZIENTE (Solo se CONFERMATO)
+        if final_status == AppointmentStatus.CONFIRMED and appointment:
+            patient_id = appointment['patient_id']
+            pat_res = table.get_item(Key={'PK': f"USER#{patient_id}", 'SK': 'PROFILE'})
+            patient_data = pat_res.get('Item', {})
+            patient_email = patient_data.get('email')
+
+            if patient_email:
+                subj = "CONFERMA PRENOTAZIONE - Clinica San Marco"
+                msg_text = (
+                    f"Gentile {patient_data.get('name', 'Paziente')},\n\n"
+                    f"Siamo lieti di confermare il tuo appuntamento.\n"
+                    f"------------------------------------------------\n"
+                    f"MEDICO: {appointment.get('doctor_name')}\n"
+                    f"SPECIALIZZAZIONE: {appointment.get('doctor_specialization', 'Specialistica')}\n"
+                    f"QUANDO: {appointment.get('date')} alle ore {appointment.get('time_slot')}\n"
+                    f"DOVE: Clinica San Marco, Via Roma 10, Milano\n"
+                    f"------------------------------------------------\n\n"
+                    f"Si prega di presentarsi in accettazione 10 minuti prima dell'orario indicato.\n"
+                    f"Cordiali Saluti,\n"
+                    f"Lo Staff di Clinica San Marco"
+                )
+                sns_client.publish(
+                    TopicArn=SNS_TOPIC_ARN,
+                    Message=msg_text,
+                    Subject=subj,
+                    MessageAttributes={'email': {'DataType': 'String', 'StringValue': patient_email}}
+                )
+
     except Exception as e:
-        print(f"ERRORE DB: {e}")
+        print(f"ERRORE DB/SNS: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"message": "Stato aggiornato", "status": final_status}
 
-# --- UPLOAD REFERTO INTELLIGENTE (Gestisce Duplicati e Update) ---
+# --- UPLOAD REFERTO INTELLIGENTE + NOTIFICA RICCA ---
 @app.post("/api/reports/upload")
 async def upload_report(
     file: UploadFile, appointment_id: str, exam_type: str, exam_date: str,
@@ -344,13 +390,11 @@ async def upload_report(
     if current_user['role'] != UserRole.DOCTOR:
         raise HTTPException(status_code=403, detail="Non autorizzato")
 
-    # 1. Recupera l'appuntamento
     res = table.get_item(Key={'PK': f"APPT#{appointment_id}", 'SK': 'APPT'})
     appointment = res.get('Item')
     if not appointment:
         raise HTTPException(status_code=404, detail="Appuntamento non trovato")
 
-    # 2. CONTROLLO ESISTENZA: Cerca se c'è già un referto
     existing_report_scan = table.scan(
         FilterExpression=Attr('appointment_id').eq(appointment_id) & Attr('SK').eq('METADATA')
     )
@@ -359,28 +403,21 @@ async def upload_report(
     is_update = False
     
     if len(existing_reports) > 0:
-        # --- MODALITÀ AGGIORNAMENTO ---
-        # Riutilizza ID e chiave S3 per sovrascrivere
         old_report = existing_reports[0]
         report_id = old_report['report_id']
         s3_key = old_report['s3_key'] 
         is_update = True
-        print(f"Aggiornamento referto esistente: {report_id}")
     else:
-        # --- MODALITÀ CREAZIONE ---
-        # Nuovo ID e nuova chiave S3
         report_id = str(uuid.uuid4())
         s3_key = f"reports/{appointment['patient_id']}/{report_id}_{file.filename}"
         is_update = False
 
-    # 3. Carica su S3 (Sovrascrive se esiste già)
     try:
         await file.seek(0)
         s3_client.upload_fileobj(file.file, S3_BUCKET_NAME, s3_key, ExtraArgs={'ContentType': file.content_type})
     except Exception as e:
         raise HTTPException(status_code=500, detail="Errore S3")
 
-    # 4. Aggiorna DynamoDB
     item = {
         'PK': f"REPORT#{report_id}", 'SK': 'METADATA',
         'report_id': report_id, 
@@ -397,47 +434,60 @@ async def upload_report(
     }
     table.put_item(Item=item)
 
-    # 5. Notifica SNS (Solo se è NUOVO per evitare spam)
+    # 🔔 NOTIFICA SNS RICCA AL PAZIENTE (Solo se NUOVO)
     if not is_update:
         try:
             pat_res = table.get_item(Key={'PK': f"USER#{appointment['patient_id']}", 'SK': 'PROFILE'})
-            if 'Item' in pat_res:
-                patient_email = pat_res['Item']['email']
-                message = (f"Nuovo referto disponibile per {exam_type}.")
+            patient_data = pat_res.get('Item')
+            
+            if patient_data and patient_data.get('email'):
+                patient_email = patient_data['email']
+                doctor_surname = current_user.get('surname', 'Medico')
+                notes_text = f"NOTE MEDICO: {notes}\n" if notes else ""
+
+                subj = f"NUOVO REFERTO DISPONIBILE: {exam_type}"
+                msg_text = (
+                    f"Gentile {patient_data.get('name', 'Paziente')},\n\n"
+                    f"Il Dr. {doctor_surname} ha appena caricato un nuovo referto medico.\n"
+                    f"------------------------------------------------\n"
+                    f"TIPOLOGIA ESAME: {exam_type}\n"
+                    f"DATA ESECUZIONE: {exam_date}\n"
+                    f"{notes_text}"
+                    f"------------------------------------------------\n\n"
+                    f"Il documento PDF è pronto per il download.\n"
+                    f"Accedi alla tua Area Riservata per scaricarlo in sicurezza.\n\n"
+                    f"Clinica San Marco - Servizio Referti Digitali"
+                )
+
                 sns_client.publish(
                     TopicArn=SNS_TOPIC_ARN,
-                    Message=message,
-                    Subject="Nuovo Referto Disponibile",
+                    Message=msg_text,
+                    Subject=subj,
                     MessageAttributes={'email': {'DataType': 'String', 'StringValue': patient_email}}
                 )
         except Exception as e:
-            print(f"Errore notifica: {e}")
+            print(f"Errore notifica Referto: {e}")
 
     return {"message": "Referto aggiornato" if is_update else "Referto caricato"}
 
-# --- ENDPOINT PATCH: MODIFICA SOLO NOTE (NUOVO) ---
 @app.patch("/api/reports/{report_id}")
 async def update_report_notes(
     report_id: str, 
     update_data: ReportUpdate, 
     current_user: dict = Depends(get_current_user)
 ):
-    # 1. Controllo Ruolo
     if current_user['role'] != UserRole.DOCTOR:
         raise HTTPException(status_code=403, detail="Non autorizzato")
 
-    # 2. Recupera il report per verificare la proprietà
     response = table.get_item(Key={'PK': f"REPORT#{report_id}", 'SK': 'METADATA'})
     report = response.get('Item')
 
     if not report:
         raise HTTPException(status_code=404, detail="Referto non trovato")
 
-    # 3. Verifica che sia il medico che lo ha creato
     if report['doctor_id'] != current_user['user_id']:
         raise HTTPException(status_code=403, detail="Non puoi modificare referti altrui")
 
-    # 4. Aggiorna solo il campo note e il timestamp
     try:
         table.update_item(
             Key={'PK': f"REPORT#{report_id}", 'SK': 'METADATA'},
@@ -463,7 +513,6 @@ async def get_my_reports(current_user: dict = Depends(get_current_user)):
         res = table.scan(FilterExpression=Attr('doctor_id').eq(user_id) & Attr('SK').eq('METADATA'))
     
     reports = res['Items']
-    # Arricchiamo con i nomi dei dottori (qui lo scan è leggero)
     for r in reports:
         doc_res = table.get_item(Key={'PK': f"USER#{r['doctor_id']}", 'SK': 'PROFILE'})
         if 'Item' in doc_res:
@@ -486,7 +535,7 @@ async def download_report(report_id: str, current_user: dict = Depends(get_curre
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "cloud": "active", "version": "4.7.0"}
+    return {"status": "ok", "cloud": "active", "version": "4.8.0"}
 
 if __name__ == "__main__":
     import uvicorn
