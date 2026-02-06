@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key, Attr
 from passlib.context import CryptContext
 
-app = FastAPI(title="Clinica API - Enterprise Edition", version="4.6.0")
+app = FastAPI(title="Clinica API - Enterprise Edition", version="4.7.0")
 
 # --- CONFIGURAZIONE AWS ---
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
@@ -77,6 +77,10 @@ class LoginRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
+
+# --- MODELLO PER UPDATE NOTE REFERTO (NUOVO) ---
+class ReportUpdate(BaseModel):
+    notes: str
 
 # --- 🔒 MODELLI SICURI (NO PASSWORD) ---
 class UserResponse(BaseModel):
@@ -411,6 +415,45 @@ async def upload_report(
 
     return {"message": "Referto aggiornato" if is_update else "Referto caricato"}
 
+# --- ENDPOINT PATCH: MODIFICA SOLO NOTE (NUOVO) ---
+@app.patch("/api/reports/{report_id}")
+async def update_report_notes(
+    report_id: str, 
+    update_data: ReportUpdate, 
+    current_user: dict = Depends(get_current_user)
+):
+    # 1. Controllo Ruolo
+    if current_user['role'] != UserRole.DOCTOR:
+        raise HTTPException(status_code=403, detail="Non autorizzato")
+
+    # 2. Recupera il report per verificare la proprietà
+    response = table.get_item(Key={'PK': f"REPORT#{report_id}", 'SK': 'METADATA'})
+    report = response.get('Item')
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Referto non trovato")
+
+    # 3. Verifica che sia il medico che lo ha creato
+    if report['doctor_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Non puoi modificare referti altrui")
+
+    # 4. Aggiorna solo il campo note e il timestamp
+    try:
+        table.update_item(
+            Key={'PK': f"REPORT#{report_id}", 'SK': 'METADATA'},
+            UpdateExpression="set #n = :n, #u = :u",
+            ExpressionAttributeNames={'#n': 'notes', '#u': 'last_updated'},
+            ExpressionAttributeValues={
+                ':n': update_data.notes,
+                ':u': datetime.now().isoformat()
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"message": "Note aggiornate con successo", "notes": update_data.notes}
+
 @app.get("/api/reports/my")
 async def get_my_reports(current_user: dict = Depends(get_current_user)):
     user_id = current_user['user_id']
@@ -443,7 +486,7 @@ async def download_report(report_id: str, current_user: dict = Depends(get_curre
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "cloud": "active", "version": "4.6.0"}
+    return {"status": "ok", "cloud": "active", "version": "4.7.0"}
 
 if __name__ == "__main__":
     import uvicorn
