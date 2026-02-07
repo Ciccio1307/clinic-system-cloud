@@ -70,54 +70,60 @@ function App() {
 }
 
 // ============================================
-// 0. HOMEPAGE
+// 0. HOMEPAGE (CATANIA EDITION 🌋)
 // ============================================
 
 function HomePage({ onEnter }) {
     return (
         <div className="homepage">
             <nav className="landing-navbar">
-                <div className="brand"><Activity /> Clinica San Marco</div>
+                <div className="brand"><Activity /> Poliambulatorio Etneo</div>
                 <button className="btn-outline" onClick={onEnter}>Area Riservata</button>
             </nav>
 
             <header className="hero-section">
-                <h1>La tua salute,<br />la nostra priorità.</h1>
-                <p>Prenotazioni online immediate, referti digitali e un team di specialisti sempre al tuo fianco.</p>
-                <button className="btn-cta" onClick={onEnter}>Prenota Ora</button>
+                <h1>La salute al centro<br />di Catania.</h1>
+                <p>Prenotazioni online immediate, specialisti d'eccellenza e referti digitali.</p>
+                <p style={{ marginTop: '10px', fontSize: '0.9rem', opacity: 0.9, fontWeight: '500' }}>
+                    📍 Via Etnea 200, 95131 Catania (CT)
+                </p>
+                <button className="btn-cta" onClick={onEnter}>Prenota Visita</button>
             </header>
 
             <section className="features-section">
-                <h2>Perché Sceglierci</h2>
+                <h2>Eccellenza Siciliana</h2>
                 <div className="features-grid">
                     <div className="feature-card">
                         <div className="icon">🩺</div>
-                        <h3>Team Multidisciplinare</h3>
-                        <p>Oltre 15 specializzazioni mediche, dalla Cardiologia alla Pediatria, per un'assistenza completa.</p>
+                        <h3>Specialisti in Sede</h3>
+                        <p>Cardiologia, Ortopedia e oltre 15 specializzazioni disponibili nel cuore di Catania.</p>
                     </div>
                     <div className="feature-card">
                         <div className="icon">⚡</div>
                         <h3>Zero Code</h3>
-                        <p>Dimentica le attese. Scegli il medico, l'orario e prenota online 24/7 in autonomia.</p>
+                        <p>Prenota dal tuo smartphone 24/7 senza passare dall'accettazione.</p>
                     </div>
                     <div className="feature-card">
                         <div className="icon">📱</div>
-                        <h3>Tutto Digitale</h3>
-                        <p>Gestisci i tuoi appuntamenti e scarica i referti medici direttamente dal tuo computer.</p>
+                        <h3>Referti Cloud</h3>
+                        <p>Scarica i tuoi documenti medici ovunque ti trovi, in totale sicurezza.</p>
                     </div>
                 </div>
             </section>
+
+            <footer style={{ textAlign: 'center', padding: '2rem', color: '#666', fontSize: '0.8rem', borderTop: '1px solid #eee', marginTop: '2rem' }}>
+                &copy; 2026 Poliambulatorio Etneo - Via Etnea 200, Catania - Tel. 095 1234567
+            </footer>
         </div>
     );
 }
 
 // ============================================
-// 1. LOGIN & REGISTRAZIONE (AGGIORNATO)
+// 1. LOGIN & REGISTRAZIONE
 // ============================================
 
 function LoginPage({ onLogin, onBack }) {
     const [isLogin, setIsLogin] = useState(true);
-    // Stato controllato per tutti i campi
     const [formData, setFormData] = useState({
         email: '', password: '', role: 'patient',
         name: '', surname: '', phone: '', specialization: ''
@@ -132,11 +138,9 @@ function LoginPage({ onLogin, onBack }) {
                 const res = await axios.post(`${API_URL}/api/auth/login`, { email: formData.email, password: formData.password });
                 onLogin(res.data.token, res.data.user);
             } else {
-                // Controllo lunghezza telefono (opzionale doppio check)
                 if (formData.phone.length !== 10 && formData.role === 'patient') {
-                    // Qui potresti lanciare un errore, ma il blocco input lo previene già
+                    // Validazione lunghezza telefono
                 }
-
                 await axios.post(`${API_URL}/api/auth/register`, { ...formData, specialization: formData.role === 'doctor' ? formData.specialization : null });
                 toast.success('Registrato! Ora accedi.');
                 setIsLogin(true);
@@ -144,7 +148,6 @@ function LoginPage({ onLogin, onBack }) {
         } catch (error) { toast.error(getErrorMessage(error)); } finally { setLoading(false); }
     };
 
-    // --- GESTIONE TELEFONO (SOLO NUMERI, MAX 10) ---
     const handlePhoneChange = (e) => {
         const onlyNums = e.target.value.replace(/[^0-9]/g, '');
         if (onlyNums.length <= 10) {
@@ -173,7 +176,6 @@ function LoginPage({ onLogin, onBack }) {
                                 required
                             />
 
-                            {/* INPUT TELEFONO BLOCCATO */}
                             <input
                                 type="tel"
                                 placeholder="Telefono (10 cifre)"
@@ -218,7 +220,7 @@ function LoginPage({ onLogin, onBack }) {
 }
 
 // ============================================
-// 2. DASHBOARD MEDICO (AGGIORNATA)
+// 2. DASHBOARD MEDICO (BRAND AGGIORNATO)
 // ============================================
 
 function DoctorDashboardAdvanced({ user, onLogout }) {
@@ -266,7 +268,7 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
     return (
         <div className="dashboard">
             <nav className="navbar">
-                <div className="brand"><Activity /> Portale Medici</div>
+                <div className="brand"><Activity /> Poliambulatorio Etneo - Medici</div>
                 <div className="user-menu"><span>Dr. {user.surname}</span><button onClick={onLogout}>Esci</button></div>
             </nav>
 
@@ -277,7 +279,6 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
                     <button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}>Profilo</button>
                 </div>
 
-                {/* VISTA DASHBOARD (APPUNTAMENTI) */}
                 {view === 'dashboard' && (
                     <>
                         <div className="card-grid">
@@ -329,15 +330,10 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
                     </>
                 )}
 
-                {/* VISTA REFERTI (NUOVA) */}
                 {view === 'reports' && <DoctorReportsList onEditReport={setEditReportModal} />}
-
-                {/* VISTA PROFILO */}
                 {view === 'profile' && <UserProfile user={user} />}
-
             </div>
 
-            {/* MODALE UPLOAD (NUOVO REFERTO) */}
             {uploadModal && (
                 <div className="modal-overlay">
                     <div className="card modal-content">
@@ -348,7 +344,6 @@ function DoctorDashboardAdvanced({ user, onLogout }) {
                 </div>
             )}
 
-            {/* MODALE EDIT (MODIFICA NOTE REFERTO) */}
             {editReportModal && (
                 <div className="modal-overlay">
                     <div className="card modal-content">
@@ -424,7 +419,7 @@ function DoctorReportsList({ onEditReport }) {
     );
 }
 
-// --- FORM UPLOAD (POST) ---
+// --- FORM UPLOAD & EDIT ---
 function UploadForm({ appointment, onClose }) {
     const [file, setFile] = useState(null);
     const [notes, setNotes] = useState('');
@@ -456,7 +451,6 @@ function UploadForm({ appointment, onClose }) {
     );
 }
 
-// --- FORM MODIFICA (PATCH) ---
 function EditReportForm({ report, onClose }) {
     const [notes, setNotes] = useState(report.notes || '');
 
@@ -495,7 +489,7 @@ function StatCard({ title, value, icon }) {
 }
 
 // ============================================
-// 3. DASHBOARD PAZIENTE
+// 3. DASHBOARD PAZIENTE (BRAND AGGIORNATO)
 // ============================================
 
 function PatientDashboard({ user, onLogout }) {
@@ -504,7 +498,7 @@ function PatientDashboard({ user, onLogout }) {
     return (
         <div className="dashboard">
             <nav className="navbar">
-                <div className="brand" style={{ color: '#16a34a' }}><Activity /> Area Paziente</div>
+                <div className="brand" style={{ color: '#16a34a' }}><Activity /> Poliambulatorio Etneo</div>
                 <div className="user-menu"><span>{user.name}</span><button onClick={onLogout}>Esci</button></div>
             </nav>
 

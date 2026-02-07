@@ -362,7 +362,7 @@ async def universal_status_update(
                     f"MEDICO: {appointment.get('doctor_name')}\n"
                     f"SPECIALIZZAZIONE: {appointment.get('doctor_specialization', 'Specialistica')}\n"
                     f"QUANDO: {appointment.get('date')} alle ore {appointment.get('time_slot')}\n"
-                    f"DOVE: Clinica San Marco, Via Roma 10, Milano\n"
+                    f"DOVE: Poliambulatorio Etneo, Via Etnea 200, Catania\n"
                     f"------------------------------------------------\n\n"
                     f"Si prega di presentarsi in accettazione 10 minuti prima dell'orario indicato.\n"
                     f"Cordiali Saluti,\n"
