@@ -252,7 +252,7 @@ async def create_appointment(data: AppointmentRequest, current_user: dict = Depe
         'doctor_specialization': doctor_spec,
         'date': data.date, 
         'time_slot': data.time_slot, 
-        'status': AppointmentStatus.PENDING,
+        'status': AppointmentStatus.PENDING, 
         'reason': data.reason, 
         'created_at': datetime.now().isoformat()
     }
@@ -316,7 +316,7 @@ async def delete_appointment(appointment_id: str, current_user: dict = Depends(g
     )
     return {"message": "Appuntamento cancellato"}
 
-# 🔥 AGGIORNAMENTO STATO + NOTIFICA PAZIENTE 🔥
+# 🔥 AGGIORNAMENTO STATO + NOTIFICA PAZIENTE (Aggiornato Catania) 🔥
 @app.api_route("/api/appointments/{appointment_id}/status", methods=["POST", "PUT", "PATCH"])
 async def universal_status_update(
     appointment_id: str,
@@ -354,7 +354,7 @@ async def universal_status_update(
             patient_email = patient_data.get('email')
 
             if patient_email:
-                subj = "CONFERMA PRENOTAZIONE -  Poliambulatorio Etneo"
+                subj = "CONFERMA PRENOTAZIONE - Clinica San Marco"
                 msg_text = (
                     f"Gentile {patient_data.get('name', 'Paziente')},\n\n"
                     f"Siamo lieti di confermare il tuo appuntamento.\n"
@@ -362,11 +362,11 @@ async def universal_status_update(
                     f"MEDICO: {appointment.get('doctor_name')}\n"
                     f"SPECIALIZZAZIONE: {appointment.get('doctor_specialization', 'Specialistica')}\n"
                     f"QUANDO: {appointment.get('date')} alle ore {appointment.get('time_slot')}\n"
-                    f"DOVE: Poliambulatorio Etneo, Via Etnea 200, Catania\n"
+                    f"DOVE: Clinica San Marco, Via Etnea 200, Catania\n"
                     f"------------------------------------------------\n\n"
                     f"Si prega di presentarsi in accettazione 10 minuti prima dell'orario indicato.\n"
                     f"Cordiali Saluti,\n"
-                    f"Lo Staff di Poliambulatorio Etneo"
+                    f"Lo Staff di Clinica San Marco"
                 )
                 sns_client.publish(
                     TopicArn=SNS_TOPIC_ARN,
@@ -381,7 +381,7 @@ async def universal_status_update(
 
     return {"message": "Stato aggiornato", "status": final_status}
 
-# --- UPLOAD REFERTO INTELLIGENTE + NOTIFICA RICCA ---
+# --- UPLOAD REFERTO INTELLIGENTE + NOTIFICA RICCA (Aggiornato Catania) ---
 @app.post("/api/reports/upload")
 async def upload_report(
     file: UploadFile, appointment_id: str, exam_type: str, exam_date: str,
@@ -456,7 +456,7 @@ async def upload_report(
                     f"------------------------------------------------\n\n"
                     f"Il documento PDF è pronto per il download.\n"
                     f"Accedi alla tua Area Riservata per scaricarlo in sicurezza.\n\n"
-                    f"Poliambulatorio Etneo - Servizio Referti Digitali"
+                    f"Clinica San Marco - Servizio Referti Digitali"
                 )
 
                 sns_client.publish(
