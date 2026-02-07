@@ -354,7 +354,7 @@ async def universal_status_update(
             patient_email = patient_data.get('email')
 
             if patient_email:
-                subj = "CONFERMA PRENOTAZIONE - Clinica San Marco"
+                subj = "CONFERMA PRENOTAZIONE -  Poliambulatorio Etneo"
                 msg_text = (
                     f"Gentile {patient_data.get('name', 'Paziente')},\n\n"
                     f"Siamo lieti di confermare il tuo appuntamento.\n"
@@ -366,7 +366,7 @@ async def universal_status_update(
                     f"------------------------------------------------\n\n"
                     f"Si prega di presentarsi in accettazione 10 minuti prima dell'orario indicato.\n"
                     f"Cordiali Saluti,\n"
-                    f"Lo Staff di Clinica San Marco"
+                    f"Lo Staff di Poliambulatorio Etneo"
                 )
                 sns_client.publish(
                     TopicArn=SNS_TOPIC_ARN,
@@ -456,7 +456,7 @@ async def upload_report(
                     f"------------------------------------------------\n\n"
                     f"Il documento PDF è pronto per il download.\n"
                     f"Accedi alla tua Area Riservata per scaricarlo in sicurezza.\n\n"
-                    f"Clinica San Marco - Servizio Referti Digitali"
+                    f"Poliambulatorio Etneo - Servizio Referti Digitali"
                 )
 
                 sns_client.publish(
