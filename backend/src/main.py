@@ -9,7 +9,7 @@ import uuid
 import os
 import io
 
-# AWS SDK
+#  SDK
 import boto3
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key, Attr
