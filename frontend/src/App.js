@@ -112,7 +112,7 @@ function HomePage({ onEnter }) {
                 </div>
             </section>
 
-            {/* Footer con indirizzo di Catania e nome San Marco */}
+            { }
             <footer style={{ textAlign: 'center', padding: '2rem', color: '#666', fontSize: '0.8rem', borderTop: '1px solid #eee', marginTop: '2rem' }}>
                 &copy; 2026 Clinica San Marco - Via Etnea 200, Catania - Tel. 095 1234567
             </footer>
@@ -144,7 +144,6 @@ function LoginPage({ onLogin, onBack }) {
         } catch (error) { toast.error(getErrorMessage(error)); } finally { setLoading(false); }
     };
 
-    // Gestione Telefono (Blocco a 10 cifre)
     const handlePhoneChange = (e) => {
         const onlyNums = e.target.value.replace(/[^0-9]/g, '');
         if (onlyNums.length <= 10) {
@@ -541,7 +540,7 @@ function UserProfile({ user }) {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
 
-            {/* COLONNA 1: DATI UTENTE */}
+            { }
             <div className="card">
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <User size={20} /> I Miei Dati
@@ -569,7 +568,7 @@ function UserProfile({ user }) {
                 </div>
             </div>
 
-            {/* COLONNA 2: CAMBIO PASSWORD */}
+            { }
             <div className="card">
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Lock size={20} /> Sicurezza

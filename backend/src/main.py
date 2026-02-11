@@ -129,7 +129,6 @@ def get_current_user(authorization: str = Header(None)):
 
 @app.post("/api/auth/register")
 async def register(data: RegisterRequest):
-    # Nota: In produzione usare Query su GSI 'EmailIndex' invece di Scan
     scan = table.scan(FilterExpression=Attr('email').eq(data.email) & Attr('SK').eq('PROFILE'))
     if scan['Count'] > 0:
         raise HTTPException(status_code=400, detail="Email già registrata")

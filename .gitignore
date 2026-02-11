@@ -1,0 +1,28 @@
+# --- TERRAFORM ---
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+
+# --- FRONTEND (React) ---
+node_modules/
+build/
+dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- BACKEND (Python) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# --- SYSTEM & IDE ---
+.DS_Store
+.vscode/
+*.log
