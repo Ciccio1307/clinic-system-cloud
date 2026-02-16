@@ -5,6 +5,8 @@ Clinica System è una piattaforma per la gestione di prenotazioni mediche e refe
 
 ---
 
+🚀 **Live Demo:** [Accedi alla piattaforma Clinica San Marco](http://clinica-lb-1441857094.us-east-2.elb.amazonaws.com/)
+
 ## 📸 Demo del Sistema (Live Walkthrough)
 
 Di seguito viene illustrato il flusso completo ("User Journey") di utilizzo della piattaforma.
